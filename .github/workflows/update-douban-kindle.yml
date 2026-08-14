@@ -1,0 +1,115 @@
+name: Update Douban Kindle Screensaver
+
+on:
+  workflow_dispatch:
+
+  schedule:
+    - cron: "17 6,18 * * *"
+      timezone: "Asia/Shanghai"
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: "github-pages"
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    env:
+      TZ: Asia/Shanghai
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Fetch Douban data
+        run: |
+          npx @marvae24/douban-cli book export 1105344 --reading -f json -o reading-export.json
+          npx @marvae24/douban-cli book export 1105344 --wish -f json -o wish-export.json
+          npx @marvae24/douban-cli book export 1105344 -f json -o read-export.json
+
+      - name: Render screensaver
+        run: node render.js
+
+      - name: Prepare Pages site
+        run: |
+          mkdir -p site
+          cp bg_ss00.png site/bg_ss00.png
+
+          cat > site/index.html <<'EOF'
+          <!doctype html>
+          <html lang="zh-CN">
+          <head>
+            <meta charset="utf-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1">
+            <title>闲作草的豆瓣秀</title>
+            <style>
+              body {
+                margin: 0;
+                font-family: sans-serif;
+                background: #f5f5f5;
+                text-align: center;
+              }
+
+              h1 {
+                margin: 20px 0 10px;
+                font-size: 24px;
+              }
+
+              img {
+                max-width: 95vw;
+                height: auto;
+                box-shadow: 0 2px 10px rgba(0,0,0,.12);
+                background: white;
+              }
+
+              p {
+                color: #666;
+                margin-bottom: 24px;
+              }
+            </style>
+          </head>
+
+          <body>
+            <h1>闲作草的豆瓣秀</h1>
+            <p>Kindle screensaver preview</p>
+            <img src="./bg_ss00.png" alt="Douban Kindle Screensaver">
+          </body>
+          </html>
+          EOF
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+
+    permissions:
+      pages: write
+      id-token: write
+
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

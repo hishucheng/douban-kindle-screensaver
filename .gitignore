@@ -1,0 +1,15 @@
+node_modules/
+covers/
+
+reading-export.json
+wish-export.json
+read-export.json
+read.json
+reading.json
+wish.json
+bg_ss00.png
+kindle.png
+
+site/
+
+npm-debug.log*
