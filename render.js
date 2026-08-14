@@ -245,15 +245,15 @@ async function coverBuffer(book, width, height) {
        xmlns="http://www.w3.org/2000/svg">
 
     <style>
-      .cn {
-        font-family: "Microsoft YaHei", "PingFang SC", "SimSun", sans-serif;
-        fill: #111;
-      }
+     .cn {
+  font-family: "Noto Serif CJK SC", "Noto Serif SC", "SimSun", serif;
+  fill: #111;
+}
 
-      .serif {
-        font-family: "SimSun", "STSong", serif;
-        fill: #111;
-      }
+.serif {
+  font-family: "Noto Serif CJK SC", "Noto Serif SC", "SimSun", serif;
+  fill: #111;
+}
 
       .small {
         font-size: 25px;
