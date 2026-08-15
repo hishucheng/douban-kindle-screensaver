@@ -33,6 +33,14 @@ jobs:
           node-version: 24
           cache: npm
 
+      - name: Restore cover cache
+        uses: actions/cache/restore@v4
+        with:
+          path: covers
+          key: douban-cover-cache-${{ github.run_id }}
+          restore-keys: |
+            douban-cover-cache-
+
       - name: Register bundled Chinese font
         run: |
           mkdir -p ~/.local/share/fonts
@@ -50,6 +58,13 @@ jobs:
 
       - name: Render screensaver
         run: node render.js
+
+      - name: Save cover cache
+        if: always()
+        uses: actions/cache/save@v4
+        with:
+          path: covers
+          key: douban-cover-cache-${{ github.run_id }}
 
       - name: Prepare Pages site
         run: |

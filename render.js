@@ -4,6 +4,7 @@ const sharp = require("sharp");
 
 const WIDTH = 1264;
 const HEIGHT = 1680;
+
 function fmtDate(d) {
   const y = d.getFullYear();
   const m = String(d.getMonth() + 1).padStart(2, "0");
@@ -21,7 +22,10 @@ const CUTOFF = sixMonthsAgoStr();
 const ROOT = __dirname;
 const CACHE = path.join(ROOT, "covers");
 
-if (!fs.existsSync(CACHE)) fs.mkdirSync(CACHE);
+if (!fs.existsSync(CACHE)) {
+  fs.mkdirSync(CACHE, { recursive: true });
+}
+
 function todayDisplay() {
   const d = new Date();
   const y = d.getFullYear();
@@ -29,6 +33,7 @@ function todayDisplay() {
   const day = String(d.getDate()).padStart(2, "0");
   return `${y} · ${m} · ${day}`;
 }
+
 function load(name) {
   return JSON.parse(fs.readFileSync(path.join(ROOT, name), "utf8"));
 }
@@ -54,27 +59,97 @@ function stars(n) {
   return "★".repeat(n) + "☆".repeat(5 - n);
 }
 
-async function downloadCover(book) {
+function sleep(ms) {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+async function isValidCover(file) {
+  try {
+    if (!fs.existsSync(file) || fs.statSync(file).size === 0) {
+      return false;
+    }
+
+    const meta = await sharp(file).metadata();
+    return Boolean(meta.width && meta.height);
+  } catch {
+    return false;
+  }
+}
+
+async function downloadCover(book, retries = 3) {
   const file = path.join(CACHE, `${book.id}.jpg`);
+  const tmp = `${file}.tmp`;
 
-  if (!fs.existsSync(file)) {
-    console.log("下载封面：", book.title);
-
-    const res = await fetch(book.cover, {
-      headers: {
-        "User-Agent":
-          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
-        Referer: "https://book.douban.com/"
-      }
-    });
-
-    if (!res.ok) throw new Error(`${book.title}: HTTP ${res.status}`);
-
-    const buf = Buffer.from(await res.arrayBuffer());
-    fs.writeFileSync(file, buf);
+  // 已有有效缓存，直接复用
+  if (await isValidCover(file)) {
+    console.log("使用缓存封面：", book.title);
+    return file;
   }
 
-  return file;
+  // 清理可能存在的损坏缓存
+  if (fs.existsSync(file)) {
+    fs.unlinkSync(file);
+  }
+
+  if (!book.cover) {
+    throw new Error(`${book.title}: 无封面 URL`);
+  }
+
+  let lastError;
+
+  for (let attempt = 1; attempt <= retries; attempt++) {
+    try {
+      console.log(
+        `下载封面（${attempt}/${retries}）：`,
+        book.title
+      );
+
+      const res = await fetch(book.cover, {
+        headers: {
+          "User-Agent":
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+          Referer: "https://book.douban.com/",
+          Accept:
+            "image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8"
+        }
+      });
+
+      if (!res.ok) {
+        throw new Error(`${book.title}: HTTP ${res.status}`);
+      }
+
+      const buf = Buffer.from(await res.arrayBuffer());
+
+      // 先写临时文件，避免半截下载污染正式缓存
+      fs.writeFileSync(tmp, buf);
+
+      if (!(await isValidCover(tmp))) {
+        throw new Error(`${book.title}: 下载内容不是有效图片`);
+      }
+
+      fs.renameSync(tmp, file);
+
+      return file;
+    } catch (e) {
+      lastError = e;
+
+      if (fs.existsSync(tmp)) {
+        fs.unlinkSync(tmp);
+      }
+
+      console.warn(
+        `封面下载失败（${attempt}/${retries}）：`,
+        book.title,
+        e.message
+      );
+
+      if (attempt < retries) {
+        await sleep(1500 * attempt);
+      }
+    }
+  }
+
+  throw lastError;
 }
 
 async function coverBuffer(book, width, height) {
@@ -91,7 +166,11 @@ async function coverBuffer(book, width, height) {
       .png()
       .toBuffer();
   } catch (e) {
-    console.warn("封面失败：", book.title, e.message);
+    console.warn(
+      "封面失败：",
+      book.title,
+      e.message
+    );
 
     return await sharp({
       create: {
@@ -215,7 +294,11 @@ async function coverBuffer(book, width, height) {
     const p = readingLayout[i];
 
     composites.push({
-      input: await coverBuffer(b, p.w, p.h),
+      input: await coverBuffer(
+        b,
+        p.w,
+        p.h
+      ),
       left: p.x,
       top: p.y
     });
@@ -234,7 +317,11 @@ async function coverBuffer(book, width, height) {
 
   for (let i = 0; i < recentRead.length; i++) {
     composites.push({
-      input: await coverBuffer(recentRead[i], readW, readH),
+      input: await coverBuffer(
+        recentRead[i],
+        readW,
+        readH
+      ),
       left: readPos[i].x,
       top: readPos[i].y
     });
@@ -245,15 +332,15 @@ async function coverBuffer(book, width, height) {
        xmlns="http://www.w3.org/2000/svg">
 
     <style>
-     .cn {
-  font-family: "Noto Serif CJK SC", "Noto Serif SC", "SimSun", serif;
-  fill: #111;
-}
+      .cn {
+        font-family: "Noto Serif CJK SC", "Noto Serif SC", "SimSun", serif;
+        fill: #111;
+      }
 
-.serif {
-  font-family: "Noto Serif CJK SC", "Noto Serif SC", "SimSun", serif;
-  fill: #111;
-}
+      .serif {
+        font-family: "Noto Serif CJK SC", "Noto Serif SC", "SimSun", serif;
+        fill: #111;
+      }
 
       .small {
         font-size: 25px;
@@ -309,7 +396,7 @@ async function coverBuffer(book, width, height) {
     </text>
   `;
 
-  // 在读 1 本：保留当前大图布局
+  // 在读 1 本
   if (readingCount === 1) {
     const b = currentReading[0];
 
@@ -341,7 +428,7 @@ async function coverBuffer(book, width, height) {
     `;
   }
 
-  // 在读 2～3 本：卡片下方显示标题、评分、日期
+  // 在读 2～3 本
   if (readingCount >= 2) {
     currentReading.forEach((b, i) => {
       const p = readingLayout[i];
@@ -418,8 +505,10 @@ async function coverBuffer(book, width, height) {
   // 最近读过标题
   for (let i = 0; i < recentRead.length; i++) {
     const b = recentRead[i];
-    const x = readPos[i].x + readW / 2;
-    const y = readPos[i].y + readH + 39;
+    const x =
+      readPos[i].x + readW / 2;
+    const y =
+      readPos[i].y + readH + 39;
 
     svg += `
       <text x="${x}" y="${y}"
@@ -431,7 +520,7 @@ async function coverBuffer(book, width, height) {
     `;
   }
 
-  // 想读：书名加粗
+  // 想读
   recentWish.forEach((b, i) => {
     const y = 930 + i * 102;
 
@@ -447,7 +536,9 @@ async function coverBuffer(book, width, height) {
             class="cn"
             font-size="20"
             fill="#777">
-        ${b.date.slice(5).replace("-", " · ")}
+        ${b.date
+          .slice(5)
+          .replace("-", " · ")}
       </text>
     `;
   });
@@ -477,7 +568,7 @@ async function coverBuffer(book, width, height) {
           class="cn"
           font-size="26"
           fill="#666">
-    ${todayDisplay()}
+      ${todayDisplay()}
     </text>
 
     <text x="632" y="1650"
@@ -499,9 +590,18 @@ async function coverBuffer(book, width, height) {
 
   await canvas
     .composite(composites)
-    .png({ compressionLevel: 9 })
-    .toFile(path.join(ROOT, "bg_ss00.png"));
+    .png({
+      compressionLevel: 9
+    })
+    .toFile(
+      path.join(
+        ROOT,
+        "bg_ss00.png"
+      )
+    );
 
-console.log("");
-console.log("✓ 已生成：bg_ss00.png");
+  console.log("");
+  console.log(
+    "✓ 已生成：bg_ss00.png"
+  );
 })();
