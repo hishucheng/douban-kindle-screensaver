@@ -59,6 +59,9 @@ jobs:
           fi
           echo "DOUBAN_USER_ID=$DOUBAN_USER_ID" >> "$GITHUB_ENV"
 
+      - name: Resolve Douban profile
+        run: node resolve-profile.js
+
       - name: Fetch Douban data
         run: |
           npx @marvae24/douban-cli book export "$DOUBAN_USER_ID" --reading -f json -o reading-export.json
