@@ -4,5 +4,6 @@
   "pageTitle": "",
   "subtitle": "近 半 年 阅 读",
   "screenWidth": 1264,
-  "screenHeight": 1680
+  "screenHeight": 1680,
+  "safeFetchLimit": 15
 }
