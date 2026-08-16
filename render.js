@@ -4,7 +4,6 @@ const sharp = require("sharp");
 
 const WIDTH = 1264;
 const HEIGHT = 1680;
-
 function fmtDate(d) {
   const y = d.getFullYear();
   const m = String(d.getMonth() + 1).padStart(2, "0");
@@ -21,11 +20,19 @@ function sixMonthsAgoStr() {
 const CUTOFF = sixMonthsAgoStr();
 const ROOT = __dirname;
 const CACHE = path.join(ROOT, "covers");
+const CONFIG_FILE = path.join(ROOT, "config.json");
 
-if (!fs.existsSync(CACHE)) {
-  fs.mkdirSync(CACHE, { recursive: true });
+const CONFIG = JSON.parse(fs.readFileSync(CONFIG_FILE, "utf8"));
+const DOUBAN_USER_ID = String(CONFIG.doubanUserId || "").trim();
+const DISPLAY_NAME = String(CONFIG.displayName || "我 的").trim();
+const PAGE_TITLE = String(CONFIG.pageTitle || "豆瓣秀").trim();
+const SUBTITLE = String(CONFIG.subtitle || "近 半 年 阅 读").trim();
+
+if (!DOUBAN_USER_ID) {
+  throw new Error("config.json 中缺少 doubanUserId");
 }
 
+if (!fs.existsSync(CACHE)) fs.mkdirSync(CACHE, { recursive: true });
 function todayDisplay() {
   const d = new Date();
   const y = d.getFullYear();
@@ -33,7 +40,6 @@ function todayDisplay() {
   const day = String(d.getDate()).padStart(2, "0");
   return `${y} · ${m} · ${day}`;
 }
-
 function load(name) {
   return JSON.parse(fs.readFileSync(path.join(ROOT, name), "utf8"));
 }
@@ -65,10 +71,7 @@ function sleep(ms) {
 
 async function isValidCover(file) {
   try {
-    if (!fs.existsSync(file) || fs.statSync(file).size === 0) {
-      return false;
-    }
-
+    if (!fs.existsSync(file) || fs.statSync(file).size === 0) return false;
     const meta = await sharp(file).metadata();
     return Boolean(meta.width && meta.height);
   } catch {
@@ -80,16 +83,14 @@ async function downloadCover(book, retries = 3) {
   const file = path.join(CACHE, `${book.id}.jpg`);
   const tmp = `${file}.tmp`;
 
-  // 已有有效缓存，直接复用
+  // 已有有效缓存时直接复用
   if (await isValidCover(file)) {
     console.log("使用缓存封面：", book.title);
     return file;
   }
 
-  // 清理可能存在的损坏缓存
-  if (fs.existsSync(file)) {
-    fs.unlinkSync(file);
-  }
+  // 清掉以前可能留下的损坏缓存
+  if (fs.existsSync(file)) fs.unlinkSync(file);
 
   if (!book.cover) {
     throw new Error(`${book.title}: 无封面 URL`);
@@ -99,18 +100,14 @@ async function downloadCover(book, retries = 3) {
 
   for (let attempt = 1; attempt <= retries; attempt++) {
     try {
-      console.log(
-        `下载封面（${attempt}/${retries}）：`,
-        book.title
-      );
+      console.log(`下载封面（${attempt}/${retries}）：`, book.title);
 
       const res = await fetch(book.cover, {
         headers: {
           "User-Agent":
             "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
           Referer: "https://book.douban.com/",
-          Accept:
-            "image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8"
+          Accept: "image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8"
         }
       });
 
@@ -119,8 +116,6 @@ async function downloadCover(book, retries = 3) {
       }
 
       const buf = Buffer.from(await res.arrayBuffer());
-
-      // 先写临时文件，避免半截下载污染正式缓存
       fs.writeFileSync(tmp, buf);
 
       if (!(await isValidCover(tmp))) {
@@ -128,14 +123,10 @@ async function downloadCover(book, retries = 3) {
       }
 
       fs.renameSync(tmp, file);
-
       return file;
     } catch (e) {
       lastError = e;
-
-      if (fs.existsSync(tmp)) {
-        fs.unlinkSync(tmp);
-      }
+      if (fs.existsSync(tmp)) fs.unlinkSync(tmp);
 
       console.warn(
         `封面下载失败（${attempt}/${retries}）：`,
@@ -166,11 +157,7 @@ async function coverBuffer(book, width, height) {
       .png()
       .toBuffer();
   } catch (e) {
-    console.warn(
-      "封面失败：",
-      book.title,
-      e.message
-    );
+    console.warn("封面失败：", book.title, e.message);
 
     return await sharp({
       create: {
@@ -294,11 +281,7 @@ async function coverBuffer(book, width, height) {
     const p = readingLayout[i];
 
     composites.push({
-      input: await coverBuffer(
-        b,
-        p.w,
-        p.h
-      ),
+      input: await coverBuffer(b, p.w, p.h),
       left: p.x,
       top: p.y
     });
@@ -317,11 +300,7 @@ async function coverBuffer(book, width, height) {
 
   for (let i = 0; i < recentRead.length; i++) {
     composites.push({
-      input: await coverBuffer(
-        recentRead[i],
-        readW,
-        readH
-      ),
+      input: await coverBuffer(recentRead[i], readW, readH),
       left: readPos[i].x,
       top: readPos[i].y
     });
@@ -332,15 +311,15 @@ async function coverBuffer(book, width, height) {
        xmlns="http://www.w3.org/2000/svg">
 
     <style>
-      .cn {
-        font-family: "Noto Serif CJK SC", "Noto Serif SC", "SimSun", serif;
-        fill: #111;
-      }
+     .cn {
+  font-family: "Noto Serif CJK SC", "Noto Serif SC", "SimSun", serif;
+  fill: #111;
+}
 
-      .serif {
-        font-family: "Noto Serif CJK SC", "Noto Serif SC", "SimSun", serif;
-        fill: #111;
-      }
+.serif {
+  font-family: "Noto Serif CJK SC", "Noto Serif SC", "SimSun", serif;
+  fill: #111;
+}
 
       .small {
         font-size: 25px;
@@ -367,7 +346,7 @@ async function coverBuffer(book, width, height) {
           font-size="25"
           letter-spacing="5"
           fill="#666">
-      闲 作 草 的
+      ${esc(DISPLAY_NAME)}
     </text>
 
     <text x="632" y="122"
@@ -375,13 +354,13 @@ async function coverBuffer(book, width, height) {
           class="serif"
           font-size="58"
           letter-spacing="14">
-      豆瓣秀
+      ${esc(PAGE_TITLE)}
     </text>
 
     <text x="632" y="166"
           text-anchor="middle"
           class="cn small fine">
-      近 半 年 阅 读
+      ${esc(SUBTITLE)}
     </text>
 
     <line x1="90" y1="205"
@@ -396,7 +375,7 @@ async function coverBuffer(book, width, height) {
     </text>
   `;
 
-  // 在读 1 本
+  // 在读 1 本：保留当前大图布局
   if (readingCount === 1) {
     const b = currentReading[0];
 
@@ -428,7 +407,7 @@ async function coverBuffer(book, width, height) {
     `;
   }
 
-  // 在读 2～3 本
+  // 在读 2～3 本：卡片下方显示标题、评分、日期
   if (readingCount >= 2) {
     currentReading.forEach((b, i) => {
       const p = readingLayout[i];
@@ -505,10 +484,8 @@ async function coverBuffer(book, width, height) {
   // 最近读过标题
   for (let i = 0; i < recentRead.length; i++) {
     const b = recentRead[i];
-    const x =
-      readPos[i].x + readW / 2;
-    const y =
-      readPos[i].y + readH + 39;
+    const x = readPos[i].x + readW / 2;
+    const y = readPos[i].y + readH + 39;
 
     svg += `
       <text x="${x}" y="${y}"
@@ -520,7 +497,7 @@ async function coverBuffer(book, width, height) {
     `;
   }
 
-  // 想读
+  // 想读：书名加粗
   recentWish.forEach((b, i) => {
     const y = 930 + i * 102;
 
@@ -536,9 +513,7 @@ async function coverBuffer(book, width, height) {
             class="cn"
             font-size="20"
             fill="#777">
-        ${b.date
-          .slice(5)
-          .replace("-", " · ")}
+        ${b.date.slice(5).replace("-", " · ")}
       </text>
     `;
   });
@@ -568,7 +543,7 @@ async function coverBuffer(book, width, height) {
           class="cn"
           font-size="26"
           fill="#666">
-      ${todayDisplay()}
+    ${todayDisplay()}
     </text>
 
     <text x="632" y="1650"
@@ -576,7 +551,7 @@ async function coverBuffer(book, width, height) {
           class="cn"
           font-size="20"
           fill="#888">
-      DOUBAN · 1105344
+      DOUBAN · ${esc(DOUBAN_USER_ID)}
     </text>
 
   </svg>
@@ -590,18 +565,9 @@ async function coverBuffer(book, width, height) {
 
   await canvas
     .composite(composites)
-    .png({
-      compressionLevel: 9
-    })
-    .toFile(
-      path.join(
-        ROOT,
-        "bg_ss00.png"
-      )
-    );
+    .png({ compressionLevel: 9 })
+    .toFile(path.join(ROOT, "bg_ss00.png"));
 
-  console.log("");
-  console.log(
-    "✓ 已生成：bg_ss00.png"
-  );
+console.log("");
+console.log("✓ 已生成：bg_ss00.png");
 })();
