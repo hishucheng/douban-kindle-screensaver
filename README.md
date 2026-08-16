@@ -6,7 +6,7 @@
 
 > 把已经消失的「豆瓣秀」，从博客首页搬到 Kindle 屏幕上。
 
-当前版式按 **Kindle Oasis 2（1264 × 1680）** 设计。
+当前基础版式按 **Kindle Oasis 2 / 3（1264 × 1680）** 设计，也支持将最终图片缩放为常见 Paperwhite 分辨率。
 
 ## 效果与内容
 
@@ -28,7 +28,9 @@
         ↓
 resolve-profile.js（自动取得豆瓣昵称）
         ↓
-render.js
+render.js（Oasis 2 / 3 基础版式）
+        ↓
+resize-output.js（按目标 Kindle 分辨率输出）
         ↓
 bg_ss00.png
         ↓
@@ -51,14 +53,16 @@ Fork 到自己的 GitHub 账号。
 
 ### 2. 修改 `config.json`
 
-**正常情况下，唯一必须修改的是豆瓣用户 ID。**
+`doubanUserId` 是唯一必须修改的项目；`screenWidth` / `screenHeight` 按自己的 Kindle 型号选择。
 
 ```json
 {
   "doubanUserId": "1105344",
   "displayName": "",
   "pageTitle": "",
-  "subtitle": "近 半 年 阅 读"
+  "subtitle": "近 半 年 阅 读",
+  "screenWidth": 1264,
+  "screenHeight": 1680
 }
 ```
 
@@ -84,14 +88,47 @@ https://www.douban.com/people/12345678/
 因此正常使用路径就是：
 
 ```text
-Fork → 改 doubanUserId → 开启 Pages → Run workflow
+Fork → 改 doubanUserId → 按 Kindle 型号确认屏幕尺寸 → 开启 Pages → Run workflow
 ```
 
 本项目只读取豆瓣公开页面，不需要账号密码、Cookie 或 Token。因此「在读 / 读过 / 想读」需要能被公开访问。
 
 昵称同样从公开的豆瓣读书主页自动读取。如果豆瓣临时阻止访问或页面结构变化导致昵称解析失败，脚本会退回显示豆瓣 ID / 通用“豆瓣秀”，**不会继续显示仓库作者的昵称**。
 
-### 3. 开启 GitHub Pages
+### 3. 选择 Kindle 屏幕尺寸
+
+默认配置：
+
+```json
+"screenWidth": 1264,
+"screenHeight": 1680
+```
+
+对应 Kindle Oasis 2 / 3。
+
+常见机型可参考：
+
+| Kindle 型号 | 屏幕分辨率 |
+| --- | --- |
+| Kindle Paperwhite 3 | 1072 × 1448 |
+| Kindle Paperwhite 4 | 1072 × 1448 |
+| Kindle Paperwhite 5 | 1236 × 1648 |
+| Kindle Oasis 2 / 3 | 1264 × 1680 |
+
+例如 Paperwhite 5：
+
+```json
+"screenWidth": 1236,
+"screenHeight": 1648
+```
+
+项目仍以 Oasis 2 / 3 的 1264 × 1680 版式作为基础画布，再把最终图片缩放到目标分辨率。Paperwhite 3 / 4 / 5 与 Oasis 的纵横比接近，因此通常可以直接使用。
+
+> 目前没有为大屏 Kindle（例如 Scribe）设计单独版式，也不建议仅靠缩放使用本项目。
+
+如果你的设备不是以上型号，请先确认其实际屏幕分辨率，再填写 `screenWidth` / `screenHeight`。
+
+### 4. 开启 GitHub Pages
 
 进入：
 
@@ -150,7 +187,7 @@ Firmware 5.16.2.1.1
 1264 × 1680
 ```
 
-其他 Kindle 可以尝试，但不同分辨率需要调整 `render.js` 中的尺寸和布局。
+Paperwhite 3 / 4 / 5 的分辨率输出已做成配置项，但实际 Kindle 端行为仍可能因型号、固件和所用 Screensaver Hack 版本而有差异。
 
 ### Online Screensaver 关键配置
 
@@ -299,6 +336,7 @@ npx.cmd @marvae24/douban-cli book export $ID --wish -f json -o wish-export.json
 npx.cmd @marvae24/douban-cli book export $ID -f json -o read-export.json
 node resolve-profile.js
 node render.js
+node resize-output.js
 ```
 
 输出：
@@ -306,6 +344,8 @@ node render.js
 ```text
 bg_ss00.png
 ```
+
+最终 PNG 尺寸由 `config.json` 中的 `screenWidth` / `screenHeight` 决定。
 
 ## 字体
 
@@ -326,7 +366,8 @@ fonts/NotoSerifCJKsc-Regular.otf
 
 ## 已知限制
 
-- 当前布局主要适配 1264 × 1680 的 Kindle Oasis 2
+- 基础布局仍以 1264 × 1680 的 Kindle Oasis 2 / 3 为基准；其他列出的 Paperwhite 型号采用最终图片缩放适配
+- 未针对 Kindle Scribe 等大屏设备设计版式
 - 豆瓣页面结构变化可能导致 `douban-cli` 或昵称自动解析暂时失效
 - 不同 Kindle / 固件上的 Online Screensaver 行为可能不同
 - 飞行模式下定时更新可能失败，恢复网络后会在后续调度或唤醒时再次尝试
