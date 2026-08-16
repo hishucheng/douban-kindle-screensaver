@@ -96,8 +96,9 @@ async function fetchNickname(userId) {
       config.displayName = formatDisplayName(nickname);
     }
 
+    // 主标题保持统一为“豆瓣秀”，避免与上方昵称重复。
     if (!String(config.pageTitle || "").trim()) {
-      config.pageTitle = `${nickname}的豆瓣秀`;
+      config.pageTitle = "豆瓣秀";
     }
 
     console.log(`豆瓣昵称：${nickname}`);
