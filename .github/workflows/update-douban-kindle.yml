@@ -71,6 +71,9 @@ jobs:
       - name: Render screensaver
         run: node render.js
 
+      - name: Resize for target Kindle
+        run: node resize-output.js
+
       - name: Save cover cache
         if: always()
         uses: actions/cache/save@v4
