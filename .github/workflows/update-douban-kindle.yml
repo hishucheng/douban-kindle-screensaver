@@ -3,6 +3,10 @@ name: Update Douban Kindle Screensaver
 on:
   workflow_dispatch:
 
+  push:
+    branches:
+      - public-ready
+
   schedule:
     - cron: "17 6,18 * * *"
       timezone: "Asia/Shanghai"
