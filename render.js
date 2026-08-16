@@ -27,6 +27,7 @@ const DOUBAN_USER_ID = String(CONFIG.doubanUserId || "").trim();
 const DISPLAY_NAME = String(CONFIG.displayName || "我 的").trim();
 const PAGE_TITLE = String(CONFIG.pageTitle || "豆瓣秀").trim();
 const SUBTITLE = String(CONFIG.subtitle || "近 半 年 阅 读").trim();
+const SAFE_FETCH_LIMIT = Math.max(1, Number(CONFIG.safeFetchLimit) || 15);
 
 if (!DOUBAN_USER_ID) {
   throw new Error("config.json 中缺少 doubanUserId");
@@ -46,6 +47,10 @@ function load(name) {
 
 function recent(items) {
   return items.filter(x => x.date >= CUTOFF);
+}
+
+function countLabel(items) {
+  return items.length >= SAFE_FETCH_LIMIT ? `≥${items.length}` : String(items.length);
 }
 
 function esc(s = "") {
@@ -182,7 +187,7 @@ async function coverBuffer(book, width, height) {
   const read = recent(readData.items);
 
   console.log(
-    `近半年：读过 ${read.length} / 在读 ${reading.length} / 想读 ${wish.length}`
+    `近半年：读过 ${countLabel(read)} / 在读 ${countLabel(reading)} / 想读 ${countLabel(wish)}`
   );
 
   const currentReading = reading.slice(0, 3);
@@ -445,12 +450,14 @@ async function coverBuffer(book, width, height) {
     });
 
     if (reading.length > 3) {
+      const extraReading = reading.length - 3;
+      const extraLabel = reading.length >= SAFE_FETCH_LIMIT ? `≥${extraReading}` : String(extraReading);
       svg += `
         <text x="790" y="520"
               class="cn"
               font-size="23"
               fill="#777">
-          另有 ${reading.length - 3} 本在读
+          另有 ${extraLabel} 本在读
         </text>
       `;
     }
@@ -535,7 +542,7 @@ async function coverBuffer(book, width, height) {
     <text x="92" y="1602"
           class="cn"
           font-size="28">
-      半年 · 读过 ${read.length} · 在读 ${reading.length} · 想读 ${wish.length}
+      半年 · 读过 ${countLabel(read)} · 在读 ${countLabel(reading)} · 想读 ${countLabel(wish)}
     </text>
 
     <text x="1174" y="1602"
