@@ -50,14 +50,32 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Fetch Douban data
+      - name: Read project config
         run: |
-          npx @marvae24/douban-cli book export 1105344 --reading -f json -o reading-export.json
-          npx @marvae24/douban-cli book export 1105344 --wish -f json -o wish-export.json
-          npx @marvae24/douban-cli book export 1105344 -f json -o read-export.json
+          DOUBAN_USER_ID="$(node -p "require('./config.json').doubanUserId")"
+          if [ -z "$DOUBAN_USER_ID" ]; then
+            echo "config.json: doubanUserId is empty"
+            exit 1
+          fi
+          echo "DOUBAN_USER_ID=$DOUBAN_USER_ID" >> "$GITHUB_ENV"
+
+      - name: Resolve Douban profile
+        run: node resolve-profile.js
+
+      - name: Fetch Douban data safely
+        run: |
+          npx @marvae24/douban-cli book user "$DOUBAN_USER_ID" --reading --json > reading-one-page.json
+          sleep 2
+          npx @marvae24/douban-cli book user "$DOUBAN_USER_ID" --wish --json > wish-one-page.json
+          sleep 2
+          npx @marvae24/douban-cli book user "$DOUBAN_USER_ID" --json > read-one-page.json
+          node normalize-limited-data.js
 
       - name: Render screensaver
         run: node render.js
+
+      - name: Resize for target Kindle
+        run: node resize-output.js
 
       - name: Save cover cache
         if: always()
@@ -68,16 +86,17 @@ jobs:
 
       - name: Prepare Pages site
         run: |
+          PAGE_TITLE="$(node -p "require('./config.json').pageTitle || '豆瓣秀'")"
           mkdir -p site
           cp bg_ss00.png site/bg_ss00.png
 
-          cat > site/index.html <<'EOF'
+          cat > site/index.html <<EOF
           <!doctype html>
           <html lang="zh-CN">
           <head>
             <meta charset="utf-8">
             <meta name="viewport" content="width=device-width, initial-scale=1">
-            <title>闲作草的豆瓣秀</title>
+            <title>${PAGE_TITLE}</title>
             <style>
               body {
                 margin: 0;
@@ -85,28 +104,24 @@ jobs:
                 background: #f5f5f5;
                 text-align: center;
               }
-
               h1 {
                 margin: 20px 0 10px;
                 font-size: 24px;
               }
-
               img {
                 max-width: 95vw;
                 height: auto;
                 box-shadow: 0 2px 10px rgba(0,0,0,.12);
                 background: white;
               }
-
               p {
                 color: #666;
                 margin-bottom: 24px;
               }
             </style>
           </head>
-
           <body>
-            <h1>闲作草的豆瓣秀</h1>
+            <h1>${PAGE_TITLE}</h1>
             <p>Kindle screensaver preview</p>
             <img src="./bg_ss00.png" alt="Douban Kindle Screensaver">
           </body>
