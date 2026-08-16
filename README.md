@@ -26,6 +26,8 @@
         ↓
 @marvae24/douban-cli
         ↓
+resolve-profile.js（自动取得豆瓣昵称）
+        ↓
 render.js
         ↓
 bg_ss00.png
@@ -49,13 +51,13 @@ Fork 到自己的 GitHub 账号。
 
 ### 2. 修改 `config.json`
 
-**唯一必须修改的是豆瓣用户 ID。**
+**正常情况下，唯一必须修改的是豆瓣用户 ID。**
 
 ```json
 {
   "doubanUserId": "1105344",
-  "displayName": "闲 作 草 的",
-  "pageTitle": "闲作草的豆瓣秀",
+  "displayName": "",
+  "pageTitle": "",
   "subtitle": "近 半 年 阅 读"
 }
 ```
@@ -72,9 +74,22 @@ https://www.douban.com/people/12345678/
 "doubanUserId": "12345678"
 ```
 
-其他三项只是显示文字，可按喜好修改。
+`displayName` 和 `pageTitle` 默认保持空白即可。GitHub Actions 会根据 `doubanUserId` 自动访问公开的豆瓣读书主页并取得昵称：
+
+- 屏保顶部自动显示该豆瓣昵称；较短的中文昵称会自动排成类似 `闲 作 草 的` 的形式
+- GitHub Pages 页面标题自动生成成“昵称的豆瓣秀”
+- 如果你希望自定义显示方式，可以手工填写 `displayName` 或 `pageTitle` 覆盖自动值
+- `subtitle` 是副标题，可自行修改
+
+因此正常使用路径就是：
+
+```text
+Fork → 改 doubanUserId → 开启 Pages → Run workflow
+```
 
 本项目只读取豆瓣公开页面，不需要账号密码、Cookie 或 Token。因此「在读 / 读过 / 想读」需要能被公开访问。
+
+昵称同样从公开的豆瓣读书主页自动读取。如果豆瓣临时阻止访问或页面结构变化导致昵称解析失败，脚本会退回显示豆瓣 ID / 通用“豆瓣秀”，**不会继续显示仓库作者的昵称**。
 
 ### 3. 开启 GitHub Pages
 
@@ -282,6 +297,7 @@ $ID = (Get-Content .\config.json | ConvertFrom-Json).doubanUserId
 npx.cmd @marvae24/douban-cli book export $ID --reading -f json -o reading-export.json
 npx.cmd @marvae24/douban-cli book export $ID --wish -f json -o wish-export.json
 npx.cmd @marvae24/douban-cli book export $ID -f json -o read-export.json
+node resolve-profile.js
 node render.js
 ```
 
@@ -311,7 +327,7 @@ fonts/NotoSerifCJKsc-Regular.otf
 ## 已知限制
 
 - 当前布局主要适配 1264 × 1680 的 Kindle Oasis 2
-- 豆瓣页面结构变化可能导致 `douban-cli` 暂时失效
+- 豆瓣页面结构变化可能导致 `douban-cli` 或昵称自动解析暂时失效
 - 不同 Kindle / 固件上的 Online Screensaver 行为可能不同
 - 飞行模式下定时更新可能失败，恢复网络后会在后续调度或唤醒时再次尝试
 
