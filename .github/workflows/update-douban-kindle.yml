@@ -66,6 +66,9 @@ jobs:
       - name: Resolve Douban profile
         run: node resolve-profile.js
 
+      - name: Inspect exporter options
+        run: npx @marvae24/douban-cli book export --help
+
       - name: Fetch Douban data
         run: |
           npx @marvae24/douban-cli book export "$DOUBAN_USER_ID" --reading -f json -o reading-export.json
