@@ -89,6 +89,7 @@ jobs:
           PAGE_TITLE="$(node -p "require('./config.json').pageTitle || '豆瓣秀'")"
           mkdir -p site
           cp bg_ss00.png site/bg_ss00.png
+          cp bg_kpw3.png site/bg_kpw3.png
 
           cat > site/index.html <<EOF
           <!doctype html>

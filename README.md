@@ -163,6 +163,14 @@ https://<GitHub用户名>.github.io/<仓库名>/bg_ss00.png
 https://hishucheng.github.io/douban-kindle-screensaver/bg_ss00.png
 ```
 
+本仓库还会同时发布适配 Paperwhite 3 / 4 的 1072 × 1448 灰度图：
+
+```text
+https://hishucheng.github.io/douban-kindle-screensaver/bg_kpw3.png
+```
+
+Oasis 2 / 3 继续使用 `bg_ss00.png`，KPW3 / KPW4 使用 `bg_kpw3.png`，避免两种分辨率共用同一文件。
+
 ## 自动更新时间
 
 GitHub Actions 默认北京时间每天两次：

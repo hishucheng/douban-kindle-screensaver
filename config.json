@@ -5,5 +5,12 @@
   "subtitle": "近 半 年 阅 读",
   "screenWidth": 1264,
   "screenHeight": 1680,
+  "deviceOutputs": [
+    {
+      "file": "bg_kpw3.png",
+      "width": 1072,
+      "height": 1448
+    }
+  ],
   "safeFetchLimit": 15
 }
