@@ -53,7 +53,7 @@ Fork 到自己的 GitHub 账号。
 
 ### 2. 修改 `config.json`
 
-`doubanUserId` 是唯一必须修改的项目；`screenWidth` / `screenHeight` 按自己的 Kindle 型号选择。
+`doubanUserId` 是唯一必须修改的项目。默认保留 Oasis 2 / 3 基础图，同时生成 KPW3 / KPW4 专用图：
 
 ```json
 {
@@ -62,7 +62,14 @@ Fork 到自己的 GitHub 账号。
   "pageTitle": "",
   "subtitle": "近 半 年 阅 读",
   "screenWidth": 1264,
-  "screenHeight": 1680
+  "screenHeight": 1680,
+  "deviceOutputs": [
+    {
+      "file": "bg_kpw3.png",
+      "width": 1072,
+      "height": 1448
+    }
+  ]
 }
 ```
 
@@ -88,7 +95,7 @@ https://www.douban.com/people/12345678/
 因此正常使用路径就是：
 
 ```text
-Fork → 改 doubanUserId → 按 Kindle 型号确认屏幕尺寸 → 开启 Pages → Run workflow
+Fork → 改 doubanUserId → 确认目标设备输出 → 开启 Pages → Run workflow
 ```
 
 本项目只读取豆瓣公开页面，不需要账号密码、Cookie 或 Token。因此「在读 / 读过 / 想读」需要能被公开访问。
@@ -118,14 +125,16 @@ Fork → 改 doubanUserId → 按 Kindle 型号确认屏幕尺寸 → 开启 Pag
 | Kindle Paperwhite 6（12th Gen，2024） | 1264 × 1680 |
 | Kindle Oasis 2 / 3 | 1264 × 1680 |
 
-例如 Paperwhite 5：
+如果只服务一台 Paperwhite 5，可以把基础输出改为：
 
 ```json
 "screenWidth": 1236,
 "screenHeight": 1648
 ```
 
-项目仍以 Oasis 2 / 3 的 1264 × 1680 版式作为基础画布，再把最终图片缩放到目标分辨率。Voyage、Oasis 1、Paperwhite 3 / 4 / 5 / 6 与 Oasis 2 / 3 的纵横比接近，因此通常可以直接使用。
+如果需要同时服务多台不同分辨率的 Kindle，建议保留基础输出，并在 `deviceOutputs` 中继续增加文件名、宽度和高度。项目仍以 Oasis 2 / 3 的 1264 × 1680 版式作为基础画布，再生成各设备专用图片。
+
+不要让不同分辨率的设备共用同一个最终 PNG。即使纵横比接近，Screensaver Hack 仍以接收与屏幕完全匹配的图片最稳妥。
 
 > 目前没有为大屏 Kindle（例如 Scribe）设计单独版式，也不建议仅靠缩放使用本项目。
 
@@ -193,16 +202,15 @@ GitHub Actions 默认北京时间每天两次：
 本项目实机测试环境：
 
 ```text
-Kindle Oasis 2
-Firmware 5.16.2.1.1
-1264 × 1680
+Kindle Oasis 2 / Firmware 5.16.2.1.1 / 1264 × 1680
+Kindle Paperwhite 3 / Firmware 5.16.2.1.1 / 1072 × 1448
 ```
 
-Voyage、Oasis 1、Paperwhite 3 / 4 / 5 / 6 的分辨率输出已做成配置项，但实际 Kindle 端行为仍可能因型号、固件和所用 Screensaver Hack 版本而有差异。
+Paperwhite 3 已完成 Kindle 端实机部署；Paperwhite 4 与它分辨率相同，但本项目的在线屏保链路尚未在 KPW4 上单独实测。其他机型的分辨率输出可通过配置生成，实际 Kindle 端行为仍可能因型号、固件和所用 Screensaver Hack 版本而有差异。
 
 ### Online Screensaver 关键配置
 
-把自己的 Pages 图片地址填入 `config.sh`：
+把自己的 Pages 图片地址填入 `config.sh`。Oasis 2 / 3 使用：
 
 ```sh
 SCHEDULE="00:00-24:00=720"
@@ -213,6 +221,16 @@ DISABLE_WIFI=0
 NETWORK_TIMEOUT=60
 RTC=1
 ```
+
+KPW3 / KPW4 使用专用输出：
+
+```sh
+IMAGE_URI="https://<username>.github.io/<repo>/bg_kpw3.png"
+SCREENSAVERFILE=/mnt/us/linkss/screensavers/bg_ss00.png
+LOGFILE=/mnt/us/onlinescreensaver.log
+```
+
+远端文件名按设备区分，本地仍保存为 `bg_ss00.png`，供 Screensaver Hack 显示。
 
 `720` 分钟约等于每 12 小时更新一次。
 
@@ -246,6 +264,53 @@ RTC=1
 下一次进入屏保时由 Screensaver Hack 正常显示。
 
 这是 **Oasis 2 实机验证** 的处理方式，其他型号未必需要。
+
+KPW3 部署也采用“只下载、不调用 `eips` 强刷”的方式，并已实机验证。
+
+## KPW3 / BusyBox shell 兼容性
+
+peterson 版 Online Screensaver 的部分脚本使用：
+
+```sh
+source config.sh
+source utils.sh
+```
+
+KPW3 上可能出现：
+
+```text
+source: config.sh: not found
+```
+
+这通常不是文件真的丢失，而是脚本没有显式指定当前目录。请把 `update.sh`、`scheduler.sh`、`enable.sh`、`disable.sh`、`checkschedule.sh` 中的加载语句统一改为：
+
+```sh
+. ./config.sh
+. ./utils.sh
+```
+
+同时保持所有 shell 文件为 UTF-8、LF 换行。
+
+## 推荐的下载策略
+
+不建议把 `ping` 某个域名作为下载前置门槛。ICMP 失败不代表 HTTPS 下载失败，反之也一样。更可靠的方式是直接以真实下载结果为准：
+
+```text
+wget 直接请求目标图片
+失败最多重试 3 次
+请求 URL 附加时间戳，绕过 CDN 缓存
+下载到目标目录内的临时文件
+确认文件非空后原子替换 bg_ss00.png
+不调用 eips，由 Screensaver Hack 显示
+```
+
+临时文件应与正式文件位于同一文件系统，例如：
+
+```sh
+DOWNLOAD_FILE="${SCREENSAVERFILE}.download"
+```
+
+这样可避免 `/tmp` 到 `/mnt/us` 的跨文件系统 ownership 警告；下载失败时也不会破坏旧屏保。
 
 ## Kindle 系统“显示封面”
 
@@ -295,7 +360,9 @@ bg_ss03.png
 
 ## 手动排错
 
-如果网页已经更新而 Kindle 没更新，可以 SSH 到 Kindle：
+如果网页已经更新而 Kindle 没更新，先区分“Screensaver Hack 正常”与“在线下载正常”。安装后显示的成功提示图只是 linkss 自带示例图，不代表豆瓣秀已经下载。
+
+可以 SSH 到 Kindle 手动运行：
 
 ```sh
 cd /mnt/us/extensions/onlinescreensaver/bin
@@ -305,13 +372,14 @@ sh ./update.sh
 查看日志：
 
 ```sh
-tail -n 50 /tmp/onlinescreensaver.log
+tail -n 50 /mnt/us/onlinescreensaver.log
 ```
 
 检查目标图片：
 
 ```sh
 ls -l /mnt/us/linkss/screensavers/bg_ss00.png
+file /mnt/us/linkss/screensavers/bg_ss00.png
 ```
 
 检查真正生效的配置：
@@ -328,6 +396,16 @@ IMAGE_URI=""
 ```
 
 第一行只是注释；真正生效的仍是空值。
+
+还应检查：
+
+- KPW3 的目标图应为 1072 × 1448，Oasis 2 的目标图应为 1264 × 1680
+- 文件时间和大小是否真的变化；旧日期可能说明仍在显示 linkss 示例图
+- 日志是否停在配置加载、Wi-Fi、下载或替换步骤
+- `source config.sh: not found` 时改用 `. ./config.sh`
+- 不要仅凭 `ping` 失败断言网络不可用，应直接测试目标 HTTPS 图片
+
+KUAL 点 `Update now` 后迅速回到菜单，本身不代表失败。动作可能仍在运行；不要立刻插入 USB，否则 `/mnt/us` 切换存储模式可能打断脚本。优先通过 Wi-Fi SSH 查看实时日志，或等待足够时间后再检查目标文件。
 
 ## 本地运行
 
@@ -353,10 +431,11 @@ node resize-output.js
 输出：
 
 ```text
-bg_ss00.png
+bg_ss00.png    # 基础输出，默认 1264 × 1680
+bg_kpw3.png    # deviceOutputs 生成，1072 × 1448
 ```
 
-最终 PNG 尺寸由 `config.json` 中的 `screenWidth` / `screenHeight` 决定。
+基础 PNG 尺寸由 `screenWidth` / `screenHeight` 决定；额外设备图片由 `deviceOutputs` 生成。
 
 ## 字体
 
@@ -381,6 +460,7 @@ fonts/NotoSerifCJKsc-Regular.otf
 - 未针对 Kindle Scribe 等大屏设备设计版式
 - 豆瓣页面结构变化可能导致 `douban-cli` 或昵称自动解析暂时失效
 - 不同 Kindle / 固件上的 Online Screensaver 行为可能不同
+- Screensaver Hack 最适合使用与设备原生分辨率完全一致的 PNG
 - 飞行模式下定时更新可能失败，恢复网络后会在后续调度或唤醒时再次尝试
 
 ## Credits
