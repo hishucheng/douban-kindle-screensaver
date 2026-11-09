@@ -1,0 +1,46 @@
+name: Keep Douban Screensaver Active
+
+# Check weekly. Create a small heartbeat commit only if the last
+# repository commit is at least 40 days old (safely below GitHub's 60-day limit).
+on:
+  workflow_dispatch:
+  schedule:
+    # Mondays at 11:43 Asia/Shanghai (03:43 UTC).
+    - cron: "43 3 * * 1"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: douban-screensaver-keepalive
+  cancel-in-progress: false
+
+jobs:
+  keepalive:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out default branch
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          persist-credentials: true
+
+      - name: Refresh repository activity when idle
+        shell: bash
+        run: |
+          set -euo pipefail
+          now=$(date -u +%s)
+          last_commit=$(git log -1 --format=%ct)
+          age_days=$(( (now - last_commit) / 86400 ))
+          echo "Days since most recent commit: ${age_days}"
+          if (( age_days < 40 )); then
+            echo "Recent activity found; no heartbeat commit required."
+            exit 0
+          fi
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          date -u +"%Y-%m-%dT%H:%M:%SZ" > .github/keepalive-last-run.txt
+          git add .github/keepalive-last-run.txt
+          git commit -m "chore: keep Douban screensaver scheduled workflows active"
+          git push origin HEAD:main
