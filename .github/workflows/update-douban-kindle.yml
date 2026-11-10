@@ -1,11 +1,7 @@
-name: Update Douban Kindle Screensaver
+name: Update Douban Kindle Screensaver (manual backup)
 
 on:
   workflow_dispatch:
-
-  schedule:
-    - cron: "19 6,18 * * *"
-      timezone: "Asia/Shanghai"
 
 permissions:
   contents: read
