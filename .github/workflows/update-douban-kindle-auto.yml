@@ -1,0 +1,157 @@
+name: Update Douban Kindle Screensaver (automatic)
+
+on:
+  workflow_dispatch:
+
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/update-douban-kindle-auto.yml"
+
+  schedule:
+    - cron: "19 6,18 * * *"
+      timezone: "Asia/Shanghai"
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: "github-pages"
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    env:
+      TZ: Asia/Shanghai
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Restore cover cache
+        uses: actions/cache/restore@v4
+        with:
+          path: covers
+          key: douban-cover-cache-${{ github.run_id }}
+          restore-keys: |
+            douban-cover-cache-
+
+      - name: Register bundled Chinese font
+        run: |
+          mkdir -p ~/.local/share/fonts
+          cp fonts/NotoSerifCJKsc-Regular.otf ~/.local/share/fonts/
+          fc-cache -f
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Read project config
+        run: |
+          DOUBAN_USER_ID="$(node -p "require('./config.json').doubanUserId")"
+          if [ -z "$DOUBAN_USER_ID" ]; then
+            echo "config.json: doubanUserId is empty"
+            exit 1
+          fi
+          echo "DOUBAN_USER_ID=$DOUBAN_USER_ID" >> "$GITHUB_ENV"
+
+      - name: Resolve Douban profile
+        run: node resolve-profile.js
+
+      - name: Fetch Douban data safely
+        run: |
+          npx @marvae24/douban-cli book user "$DOUBAN_USER_ID" --reading --json > reading-one-page.json
+          sleep 2
+          npx @marvae24/douban-cli book user "$DOUBAN_USER_ID" --wish --json > wish-one-page.json
+          sleep 2
+          npx @marvae24/douban-cli book user "$DOUBAN_USER_ID" --json > read-one-page.json
+          node normalize-limited-data.js
+
+      - name: Render screensaver
+        run: node render.js
+
+      - name: Resize for target Kindle
+        run: node resize-output.js
+
+      - name: Save cover cache
+        if: always()
+        uses: actions/cache/save@v4
+        with:
+          path: covers
+          key: douban-cover-cache-${{ github.run_id }}
+
+      - name: Prepare Pages site
+        run: |
+          PAGE_TITLE="$(node -p "require('./config.json').pageTitle || '豆瓣秀'")"
+          mkdir -p site
+          cp bg_ss00.png site/bg_ss00.png
+          cp bg_kpw3.png site/bg_kpw3.png
+
+          cat > site/index.html <<EOF
+          <!doctype html>
+          <html lang="zh-CN">
+          <head>
+            <meta charset="utf-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1">
+            <title>${PAGE_TITLE}</title>
+            <style>
+              body {
+                margin: 0;
+                font-family: serif;
+                background: #f5f5f5;
+                text-align: center;
+              }
+              h1 {
+                margin: 20px 0 10px;
+                font-size: 24px;
+              }
+              img {
+                max-width: 95vw;
+                height: auto;
+                box-shadow: 0 2px 10px rgba(0,0,0,.12);
+                background: white;
+              }
+              p {
+                color: #666;
+                margin-bottom: 24px;
+              }
+            </style>
+          </head>
+          <body>
+            <h1>${PAGE_TITLE}</h1>
+            <p>Kindle screensaver preview</p>
+            <img src="./bg_ss00.png" alt="Douban Kindle Screensaver">
+          </body>
+          </html>
+          EOF
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+
+    permissions:
+      pages: write
+      id-token: write
+
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
