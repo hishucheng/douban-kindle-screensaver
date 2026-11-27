@@ -190,7 +190,7 @@ async function coverBuffer(book, width, height) {
     `近半年：读过 ${countLabel(read)} / 在读 ${countLabel(reading)} / 想读 ${countLabel(wish)}`
   );
 
-  const currentReading = reading.slice(0, 3);
+  const currentReading = reading.slice(0, 4);
   const recentRead = read.slice(0, 4);
   const recentWish = wish.slice(0, 5);
 
@@ -210,6 +210,7 @@ async function coverBuffer(book, width, height) {
    * 1本：大图
    * 2本：双列
    * 3本：三列
+   * 4本：紧凑四列，右侧预留数量提示
    */
 
   const readingCount = currentReading.length;
@@ -249,7 +250,7 @@ async function coverBuffer(book, width, height) {
         mode: "small"
       }
     ];
-  } else if (readingCount >= 3) {
+  } else if (readingCount === 3) {
     readingLayout = [
       {
         x: 92,
@@ -279,6 +280,13 @@ async function coverBuffer(book, width, height) {
         mode: "small"
       }
     ];
+  }
+
+  if (readingCount === 4) {
+    readingLayout = [92, 280, 468, 656].map(x => ({
+      x, y: 325, w: 150, h: 210,
+      textX: x + 75, textY: 575, mode: "small"
+    }));
   }
 
   for (let i = 0; i < currentReading.length; i++) {
@@ -412,7 +420,7 @@ async function coverBuffer(book, width, height) {
     `;
   }
 
-  // 在读 2～3 本：卡片下方显示标题、评分、日期
+  // 在读 2～4 本：卡片下方显示标题、评分、日期
   if (readingCount >= 2) {
     currentReading.forEach((b, i) => {
       const p = readingLayout[i];
@@ -421,9 +429,9 @@ async function coverBuffer(book, width, height) {
         <text x="${p.textX}" y="${p.textY}"
               text-anchor="middle"
               class="serif"
-              font-size="24"
+              font-size="${readingCount === 4 ? 21 : 24}"
               font-weight="600">
-          ${esc(shortTitle(b.title, 9))}
+          ${esc(shortTitle(b.title, readingCount === 4 ? 7 : 9))}
         </text>
       `;
 
@@ -449,11 +457,11 @@ async function coverBuffer(book, width, height) {
       `;
     });
 
-    if (reading.length > 3) {
-      const extraReading = reading.length - 3;
+    if (reading.length > 4) {
+      const extraReading = reading.length - 4;
       const extraLabel = reading.length >= SAFE_FETCH_LIMIT ? `≥${extraReading}` : String(extraReading);
       svg += `
-        <text x="790" y="520"
+        <text x="855" y="440"
               class="cn"
               font-size="23"
               fill="#777">
